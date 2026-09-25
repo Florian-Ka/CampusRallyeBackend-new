@@ -16,6 +16,11 @@ const sheetIdEN = process.env.SHEET_ID_EN;
 
 const getSheetUrl = (language) => {
     const sheetId = language === "de" ? sheetIdDE : sheetIdEN;
+
+    if (!sheetId) {
+        throw new Error(`Missing environment variable SHEET_ID_${language === "de" ? "DE" : "EN"}`);
+    }
+
     return `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv`;
 };
 
@@ -142,9 +147,8 @@ if (require.main === module) {
     });
 }
 
-module.exports = {
-    app,
-    csvToJson,
-    fetchSheetData,
-    getSheetUrl
-};
+app.csvToJson = csvToJson;
+app.fetchSheetData = fetchSheetData;
+app.getSheetUrl = getSheetUrl;
+
+module.exports = app;
