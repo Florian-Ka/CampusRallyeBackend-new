@@ -60,8 +60,6 @@ const fetchRawSheetData = (url) => {
     });
 };
 
-const KEY_PATTERN = /(intro|correct-text|wrong-text|finalText|randomize-question-order|tab-title|web-link|prev-btn|check-btn|finished-btn|try-again-btn|try-again-text|continue-btn|question|link-text|solutionText|question_\d+(?:_(?:subquestion_\d+_)?(?:type|text|options|answer|letter|correctText))*)/gi;
-
 function normalizeText(value) {
     return String(value || "")
         .replace(/\r/g, "")
@@ -70,24 +68,59 @@ function normalizeText(value) {
         .replace(/""/g, '"');
 }
 
+function parseCsvRows(data) {
+    const rows = [];
+    let row = [];
+    let cell = "";
+    let quoted = false;
+
+    for (let index = 0; index < data.length; index += 1) {
+        const character = data[index];
+        const nextCharacter = data[index + 1];
+
+        if (character === '"') {
+            if (quoted && nextCharacter === '"') {
+                cell += '"';
+                index += 1;
+            } else {
+                quoted = !quoted;
+            }
+        } else if (character === "," && !quoted) {
+            row.push(cell);
+            cell = "";
+        } else if ((character === "\n" || character === "\r") && !quoted) {
+            if (character === "\r" && nextCharacter === "\n") index += 1;
+            row.push(cell);
+            if (row.some((value) => value !== "")) rows.push(row);
+            row = [];
+            cell = "";
+        } else {
+            cell += character;
+        }
+    }
+
+    row.push(cell);
+    if (row.some((value) => value !== "")) rows.push(row);
+    return rows;
+}
+
 function extractKeyValuePairs(data) {
-    const text = normalizeText(data);
-    const matches = [...text.matchAll(KEY_PATTERN)];
+    const rows = parseCsvRows(data);
     const entries = {};
 
-    matches.forEach((match, index) => {
-        const key = match[0];
-        const start = match.index + key.length;
-        const end = index + 1 < matches.length ? matches[index + 1].index : text.length;
-        let value = text.slice(start, end).trim();
+    if (rows.length >= 2 && rows[0].length > 2) {
+        rows[0].forEach((key, index) => {
+            if (key && rows[1][index] !== undefined) {
+                entries[normalizeText(key)] = normalizeText(rows[1][index]);
+            }
+        });
+        rows.splice(0, 2);
+    }
 
-        value = value
-            .replace(/^\s*[,:;]+\s*/, "")
-            .replace(/^[\-\s]+/, "")
-            .replace(/\s+$/, "");
-
-        if (!value) return;
-        entries[key] = value;
+    rows.forEach((columns) => {
+        const key = normalizeText(columns[0]);
+        if (!key) return;
+        entries[key] = normalizeText(columns.slice(1).join(","));
     });
 
     return entries;
