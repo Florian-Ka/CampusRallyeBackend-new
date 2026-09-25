@@ -106,6 +106,11 @@ function parseCsvRows(data) {
 
 function extractKeyValuePairs(data) {
     const rows = parseCsvRows(data);
+
+    if (rows[0]?.[0].startsWith("intro correct-text")) {
+        throw new Error("Google Sheet export is flattened. Put every keyword in column A and its value in column B.");
+    }
+
     const entries = {};
 
     if (rows.length >= 2 && rows[0].length > 2) {
