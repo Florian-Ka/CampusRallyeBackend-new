@@ -11,6 +11,8 @@ app.use(cors());
 
 const PORT = process.env.PORT || 3000;
 
+const errorMessage = (error) => error instanceof Error ? error.message : String(error);
+
 const sheetIdDE = process.env.SHEET_ID_DE;
 const sheetIdEN = process.env.SHEET_ID_EN;
 
@@ -170,7 +172,7 @@ app.get("/raw", async (req, res) => {
         const data = await fetchRawSheetData(url);
         res.type("text/plain").send(data);
     } catch (error) {
-        res.status(500).json({ error });
+        res.status(500).json({ error: errorMessage(error) });
     }
 });
 
@@ -179,7 +181,7 @@ app.get("/", async (req, res) => {
         const data = await fetchSheetData(getSheetUrl("de"));
         res.json(data);
     } catch (error) {
-        res.status(500).json({ error });
+        res.status(500).json({ error: errorMessage(error) });
     }
 });
 
@@ -189,7 +191,7 @@ app.get("/de", async (req, res) => {
         const data = await fetchSheetData(getSheetUrl("de"));
         res.json(data);
     } catch (error) {
-        res.status(500).json({ error });
+        res.status(500).json({ error: errorMessage(error) });
     }
 });
 
@@ -199,7 +201,7 @@ app.get("/en", async (req, res) => {
         const data = await fetchSheetData(getSheetUrl("en"));
         res.json(data);
     } catch (error) {
-        res.status(500).json({ error });
+        res.status(500).json({ error: errorMessage(error) });
     }
 });
 
