@@ -42,51 +42,87 @@ const fetchSheetData = (url) => {
     });
 };
 
-function parseCsvLine(line) {
-    const cells = [];
-    let current = "";
-    let insideQuotes = false;
+const TOP_LEVEL_KEYS = [
+    "intro",
+    "correct-text",
+    "wrong-text",
+    "finalText",
+    "randomize-question-order",
+    "tab-title",
+    "web-link",
+    "prev-btn",
+    "check-btn",
+    "finished-btn",
+    "try-again-btn",
+    "try-again-text",
+    "continue-btn",
+    "question",
+    "link-text",
+    "solutionText"
+];
 
-    for (let i = 0; i < line.length; i++) {
-        const char = line[i];
+const QUESTION_FIELD_PATTERN = /(?:^|_)(type|text|options|answer|letter|correctText|subquestion_\d+_type|subquestion_\d+_text|subquestion_\d+_options|subquestion_\d+_answer)$/i;
 
-        if (char === '"') {
-            if (insideQuotes && line[i + 1] === '"') {
-                current += '"';
-                i++;
-            } else {
-                insideQuotes = !insideQuotes;
-            }
-            continue;
+function normalizeText(value) {
+    return String(value || "")
+        .replace(/\r/g, "")
+        .replace(/\u00a0/g, " ")
+        .replace(/^\s+|\s+$/g, "")
+        .replace(/""/g, '"');
+}
+
+function findQuestionKey(text, startIndex) {
+    const regex = /question_\d+(?:_[A-Za-z0-9-]+)*/gi;
+    const match = regex.exec(text.slice(startIndex));
+    if (!match) return null;
+    return { key: match[0], index: startIndex + match.index };
+}
+
+function extractKeyValuePairs(data) {
+    const text = normalizeText(data);
+    const entries = {};
+    const orderedKeys = [];
+
+    for (let i = 0; i < TOP_LEVEL_KEYS.length; i++) {
+        const key = TOP_LEVEL_KEYS[i];
+        const keyIndex = text.toLowerCase().indexOf(key.toLowerCase());
+        if (keyIndex !== -1) {
+            orderedKeys.push({ key, index: keyIndex });
         }
-
-        if (char === ',' && !insideQuotes) {
-            cells.push(current);
-            current = "";
-            continue;
-        }
-
-        current += char;
     }
 
-    cells.push(current);
-    return cells.map((cell) => cell.replace(/\r$/, "").trim());
+    const questionMatches = [...text.matchAll(/question_\d+(?:_[A-Za-z0-9-]+)*/gi)];
+    questionMatches.forEach((match) => {
+        orderedKeys.push({ key: match[0], index: match.index });
+    });
+
+    orderedKeys.sort((a, b) => a.index - b.index);
+
+    orderedKeys.forEach((item, idx) => {
+        const next = orderedKeys[idx + 1];
+        let value = text.slice(item.index + item.key.length, next ? next.index : text.length).trim();
+
+        if (!value) return;
+
+        value = normalizeText(value)
+            .replace(new RegExp(`^${item.key}`, "i"), "")
+            .replace(/^\s*[,:;]+\s*/, "")
+            .replace(/^[\-\s]+/, "");
+
+        if (!value) return;
+
+        entries[item.key] = value;
+    });
+
+    return entries;
 }
 
 function csvToJson(data) {
-    const lines = data.replace(/\r/g, "").split("\n").filter((line) => line.trim());
+    const text = normalizeText(data);
+    const entries = extractKeyValuePairs(text);
     const jsonData = { questions: [] };
 
-    lines.forEach((line) => {
-        const cells = parseCsvLine(line);
-        if (cells.length < 2) return;
-
-        const rawKey = cells[0].trim();
-        const rawValue = cells.slice(1).join(",").trim();
-
-        const key = rawKey.replace(/^"|"$/g, "").replace(/""/g, '"');
-        const value = rawValue.replace(/^"|"$/g, "").replace(/""/g, '"');
-
+    Object.entries(entries).forEach(([key, value]) => {
         if (key.startsWith("question_")) {
             const match = key.match(/^question_(\d+)(?:_(.+))?$/);
             if (!match) return;
