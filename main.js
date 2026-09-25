@@ -42,6 +42,24 @@ const fetchSheetData = (url) => {
     });
 };
 
+const fetchRawSheetData = (url) => {
+    return new Promise((resolve, reject) => {
+        https.get(url, (res) => {
+            let data = "";
+
+            res.on("data", (chunk) => {
+                data += chunk;
+            });
+
+            res.on("end", () => {
+                resolve(data);
+            });
+        }).on("error", (err) => {
+            reject("Error fetching raw Google Sheets data: " + err.message);
+        });
+    });
+};
+
 const KEY_PATTERN = /(intro|correct-text|wrong-text|finalText|randomize-question-order|tab-title|web-link|prev-btn|check-btn|finished-btn|try-again-btn|try-again-text|continue-btn|question|link-text|solutionText|question_\d+(?:_(?:subquestion_\d+_)?(?:type|text|options|answer|letter|correctText))*)/gi;
 
 function normalizeText(value) {
@@ -105,6 +123,16 @@ function csvToJson(data) {
 }
 
 
+app.get("/raw", async (req, res) => {
+    try {
+        const url = getSheetUrl(req.query.lang === "en" ? "en" : "de");
+        const data = await fetchRawSheetData(url);
+        res.type("text/plain").send(data);
+    } catch (error) {
+        res.status(500).json({ error });
+    }
+});
+
 app.get("/", async (req, res) => {
     try {
         const data = await fetchSheetData(getSheetUrl("de"));
@@ -113,7 +141,6 @@ app.get("/", async (req, res) => {
         res.status(500).json({ error });
     }
 });
-
 
 // German Sheet Endpoint
 app.get("/de", async (req, res) => {
