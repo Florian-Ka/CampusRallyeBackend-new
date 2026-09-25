@@ -42,26 +42,7 @@ const fetchSheetData = (url) => {
     });
 };
 
-const TOP_LEVEL_KEYS = [
-    "intro",
-    "correct-text",
-    "wrong-text",
-    "finalText",
-    "randomize-question-order",
-    "tab-title",
-    "web-link",
-    "prev-btn",
-    "check-btn",
-    "finished-btn",
-    "try-again-btn",
-    "try-again-text",
-    "continue-btn",
-    "question",
-    "link-text",
-    "solutionText"
-];
-
-const QUESTION_FIELD_PATTERN = /(?:^|_)(type|text|options|answer|letter|correctText|subquestion_\d+_type|subquestion_\d+_text|subquestion_\d+_options|subquestion_\d+_answer)$/i;
+const KEY_PATTERN = /(intro|correct-text|wrong-text|finalText|randomize-question-order|tab-title|web-link|prev-btn|check-btn|finished-btn|try-again-btn|try-again-text|continue-btn|question|link-text|solutionText|question_\d+(?:_(?:subquestion_\d+_)?(?:type|text|options|answer|letter|correctText))*)/gi;
 
 function normalizeText(value) {
     return String(value || "")
@@ -71,47 +52,24 @@ function normalizeText(value) {
         .replace(/""/g, '"');
 }
 
-function findQuestionKey(text, startIndex) {
-    const regex = /question_\d+(?:_[A-Za-z0-9-]+)*/gi;
-    const match = regex.exec(text.slice(startIndex));
-    if (!match) return null;
-    return { key: match[0], index: startIndex + match.index };
-}
-
 function extractKeyValuePairs(data) {
     const text = normalizeText(data);
+    const matches = [...text.matchAll(KEY_PATTERN)];
     const entries = {};
-    const orderedKeys = [];
 
-    for (let i = 0; i < TOP_LEVEL_KEYS.length; i++) {
-        const key = TOP_LEVEL_KEYS[i];
-        const keyIndex = text.toLowerCase().indexOf(key.toLowerCase());
-        if (keyIndex !== -1) {
-            orderedKeys.push({ key, index: keyIndex });
-        }
-    }
+    matches.forEach((match, index) => {
+        const key = match[0];
+        const start = match.index + key.length;
+        const end = index + 1 < matches.length ? matches[index + 1].index : text.length;
+        let value = text.slice(start, end).trim();
 
-    const questionMatches = [...text.matchAll(/question_\d+(?:_[A-Za-z0-9-]+)*/gi)];
-    questionMatches.forEach((match) => {
-        orderedKeys.push({ key: match[0], index: match.index });
-    });
-
-    orderedKeys.sort((a, b) => a.index - b.index);
-
-    orderedKeys.forEach((item, idx) => {
-        const next = orderedKeys[idx + 1];
-        let value = text.slice(item.index + item.key.length, next ? next.index : text.length).trim();
-
-        if (!value) return;
-
-        value = normalizeText(value)
-            .replace(new RegExp(`^${item.key}`, "i"), "")
+        value = value
             .replace(/^\s*[,:;]+\s*/, "")
-            .replace(/^[\-\s]+/, "");
+            .replace(/^[\-\s]+/, "")
+            .replace(/\s+$/, "");
 
         if (!value) return;
-
-        entries[item.key] = value;
+        entries[key] = value;
     });
 
     return entries;
