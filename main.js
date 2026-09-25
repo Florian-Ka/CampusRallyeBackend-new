@@ -24,28 +24,16 @@ const getSheetUrl = (language) => {
     return `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv`;
 };
 
-const fetchSheetData = (url) => {
+const fetchText = (url, errorPrefix) => {
     return new Promise((resolve, reject) => {
-        https.get(url, (res) => {
-            let csvData = "";
-
-            res.on("data", (chunk) => {
-                csvData += chunk;
-            });
-
-            res.on("end", () => {
-                resolve(csvToJson(csvData));
-            });
-        }).on("error", (err) => {
-            reject("Error fetching Google Sheets: " + err.message);
-        });
-    });
-};
-
-const fetchRawSheetData = (url) => {
-    return new Promise((resolve, reject) => {
-        https.get(url, (res) => {
+        const request = https.get(url, (res) => {
             let data = "";
+
+            if (res.statusCode && res.statusCode >= 400) {
+                res.resume();
+                reject(`${errorPrefix}: Google Sheets returned HTTP ${res.statusCode}`);
+                return;
+            }
 
             res.on("data", (chunk) => {
                 data += chunk;
@@ -54,10 +42,25 @@ const fetchRawSheetData = (url) => {
             res.on("end", () => {
                 resolve(data);
             });
-        }).on("error", (err) => {
-            reject("Error fetching raw Google Sheets data: " + err.message);
+        });
+
+        request.setTimeout(10000, () => {
+            request.destroy(new Error("request timed out"));
+        });
+
+        request.on("error", (err) => {
+            reject("Error fetching Google Sheets: " + err.message);
         });
     });
+};
+
+const fetchSheetData = async (url) => {
+    const data = await fetchText(url, "Error fetching Google Sheets");
+    return csvToJson(data);
+};
+
+const fetchRawSheetData = (url) => {
+    return fetchText(url, "Error fetching raw Google Sheets data");
 };
 
 function normalizeText(value) {
