@@ -23,7 +23,7 @@ const getSheetUrl = (language) => {
         throw new Error(`Missing environment variable SHEET_ID_${language === "de" ? "DE" : "EN"}`);
     }
 
-    return `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv`;
+    return `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&headers=0`;
 };
 
 const fetchText = (url, errorPrefix) => {
